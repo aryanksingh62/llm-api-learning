@@ -14,9 +14,12 @@ while True:
 
     response= client.responses.create(
         model="gpt-5.4-mini",
-        input= user_input
+        input= user_input,
+        stream=True
     )
 
     print("*"*30)
-    print(response.output_text)
+    for event in response:
+        if event.type == "response.output_text.delta":
+            print(event.delta,end="",flush=True)
     print()
