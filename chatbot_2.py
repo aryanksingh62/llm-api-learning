@@ -45,5 +45,6 @@ while True:
         continue
 
     print(response.output_text)
+    print(response[0].type)
     messages.append({"role": "assistant", "content": response.output_text})
     print(f"total token usage: {response.usage.total_tokens}")

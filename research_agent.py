@@ -206,7 +206,7 @@ def save_memory(input_file,data):
         logging.info("memory saved succesfully")
 
 memory= load_memory(INPUT_FILE)
-messages= [SYSTEM_PROMPT,{"role":"system","content":f"important summary of entire converation is:{memory}"}]
+messages= [SYSTEM_PROMPT,{"role":"system","content":f"history of chats:{memory}"}]
 
 logging.info("Agent started")
 while True:
