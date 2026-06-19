@@ -8,6 +8,20 @@ import logging
 import time
 import os
 
+SYSTEM_PROMPT={"role":"system","content":"""You are a research agent.
+                    When the user gives a topic:
+
+                    1. Call web_search.
+                    2. Analyze results.
+                    3. Select relevant information.
+                    4. Call report_maker with:
+                        topic
+                        summary
+                        key_points
+                        sources
+                    5. After report_maker succeeds, stop and tell the user that the report was saved.
+
+                    Never call the same tool repeatedly."""}
 load_dotenv()
 client = OpenAI()
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -69,13 +83,10 @@ def make_report(topic,summary,key_points,sources):
     logging.info(f"report maker tool staretd")
     report="report.json"
     content={
-    "topic": topic,
-    "summary": summary,
-    "key_points": key_points,
-    "sources": sources
-    }
-    report_content=Report.model_validate(content)
+    "topic": topic,"summary": summary,"key_points": key_points,"sources": sources}
+
     try:
+        report_content=Report.model_validate(content)
         if not Path(report).is_file():
             Path(report).touch()
             with open(report,"w") as f:
@@ -88,9 +99,12 @@ def make_report(topic,summary,key_points,sources):
 
         with open(report,"w") as f:
             json.dump(data,f,indent=4)
-            
-            logging.info(f"report maker success")
-            return "Report saved successfully."
+        
+        memory.append({"topic": topic, "summary": summary})
+        save_memory(INPUT_FILE, memory)
+
+        logging.info(f"report maker success")
+        return "Report saved succesfully"
         
     except Exception as e:
         logging.error(f"tool: report_maker--{e}\n")
@@ -100,7 +114,7 @@ def make_report(topic,summary,key_points,sources):
 web_search_tool = {
     "type": "function",
     "name": "web_search",
-    "description": "Search the web for a topic or question. Returns up to 5 ranked results, each with title, URL, a short summary, and the full page text.",
+    "description": "Search the web for a topic or question. Returns up to 5 ranked results, each with title, URL and a short summary",
     "parameters": {
         "type": "object",
         "properties": {
@@ -150,9 +164,6 @@ report_maker_tool = {
 
 tools=[web_search_tool,report_maker_tool]
 
-class Checker(BaseModel):
-    memory: str
-
 func_map={"web_search":web_search,
          "make_report":make_report}
 
@@ -177,21 +188,6 @@ def call_api(messages):
             time.sleep(20)
     return None
 
-def call_api_for_memory(messg):
-    logging.info("api call for long_term memory summariztion started.")
-    for i in range(1,4):
-        try:
-            response = client.responses.parse(
-                            model="gpt-5.4-mini",
-                            input=messg,
-                            text_format= Checker
-                )
-            return response
-        
-        except Exception as e:
-            logging.error(f"api request for long_term memory failed:#{i} {e}")
-            time.sleep(20)    
-    return None
      
 def load_memory(input_file):
     if not Path(input_file).is_file():
@@ -207,23 +203,10 @@ def load_memory(input_file):
 def save_memory(input_file,data):
     with open(input_file,"w",encoding="utf-8") as f:
         json.dump(data,f)
+        logging.info("memory saved succesfully")
 
 memory= load_memory(INPUT_FILE)
-messages= [{"role":"system","content":"""You are a research agent.
-                    When the user gives a topic:
-
-                    1. Call web_search.
-                    2. Analyze results.
-                    3. Select relevant information.
-                    4. Call report_maker with:
-                        topic
-                        summary
-                        key_points
-                        sources
-                    5. After report_maker succeeds, stop and tell the user that the report was saved.
-
-                    Never call the same tool repeatedly."""},
-           {"role":"system","content":f"important summary of entire converation is:{memory}"}]
+messages= [SYSTEM_PROMPT,{"role":"system","content":f"important summary of entire converation is:{memory}"}]
 
 logging.info("Agent started")
 while True:
@@ -244,7 +227,9 @@ while True:
                     model="gpt-5.4-mini",
                     input=[{"role":"user","content":f"give me the summary of this conversation:{messages[-20:]}"}]
                 )
-                messages= [{"role":"system","content":f"converstaion summary:{summary.output_text}"}]
+                messages = [SYSTEM_PROMPT,
+                            {"role": "system", "content": f"conversation summary: {summary.output_text}"}]
+                
             except Exception as e:
                 logging.error(e)
 
@@ -263,7 +248,10 @@ while True:
 
             name= tool_call.name
             args= json.loads(tool_call.arguments)
-            result= call_function(name,args)
+            try:
+                result = call_function(name, args)
+            except Exception as e:
+                result = f"tool '{name}' failed: {e}"
 
             messages.append(tool_call)
             messages.append({ "type": "function_call_output",
@@ -273,16 +261,6 @@ while True:
         if not tool_found:
             print(response.output_text)
             messages.append({"role":"assistant","content":response.output_text})
-
-            messg=[{"role":"user","content":f"extract permanent facts:{response.output_text}"}]
-            imp_memory = call_api_for_memory(messg)
-
-            if imp_memory is None:
-                logging.error("memory is not saved")
-                continue
-
-            parsed_data= imp_memory.output_parsed.model_dump()
-            memory.append(parsed_data)
-            save_memory(INPUT_FILE,memory)
+            
             break
         iteration+=1
