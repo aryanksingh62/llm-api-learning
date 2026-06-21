@@ -82,8 +82,7 @@ def make_report(topic,summary,key_points,sources):
 
     logging.info(f"report maker tool staretd")
     report="report.json"
-    content={
-    "topic": topic,"summary": summary,"key_points": key_points,"sources": sources}
+    content={"topic": topic,"summary": summary,"key_points": key_points,"sources": sources}
 
     try:
         report_content=Report.model_validate(content)
