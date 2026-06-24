@@ -41,7 +41,7 @@ def search_memory(query):
         model="gpt-5.4-mini",
         input=prompt
     )
-
+    logging.info("search tool succed")
     return response.output_text
 
 class Format(BaseModel):
@@ -62,7 +62,7 @@ def save_memory(memory):
     
     save_data.append(data)
     with open(memory_file,"w") as f:
-        json.dump(save_data,f)
+        json.dump(save_data,f,indent=4)
         logging.info(f"memory saved succesfully")
     return f"memory saved suucesfully"
 
@@ -162,10 +162,10 @@ while True:
             messages.append(tool_call)
             messages.append({"type":"function_call_output",
                                 "call_id":tool_call.call_id,
-                                "output":str(result)})
+                                "output":json.dumps(result)})
         
         if not tool_found:
             print(response.output_text)
-            messages.append(response.output_text)
+            messages.append({"role":"assitant","content":response.output_text})
             break
         iteration+=1
