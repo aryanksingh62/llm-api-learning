@@ -1,27 +1,33 @@
+from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
 query=input("what can i help?: ").strip()
 
-prompt= ChatPromptTemplate.from_template(""" 
-    you are a helpful study assistant.
-    query:{query}
-    
-    Explain the topic clearly.""")
-
-model= init_chat_model(
-    "openai:gpt-5.4-mini",
-)
+def get_weather(city:str) -> str:
+    """Get weather for a given city."""
+    return f"It's always sunny in {city}!"
 
 class StudyNotes(BaseModel):
     summary: str
     key_points: list[str]
 
-structured_model= model.with_structured_output(StudyNotes)
+system_prompt="you are helpgul study assistant"
 
-chain= prompt | structured_model
-result= chain.invoke({"query":query})
-print(result.summary)
+model= init_chat_model(
+    "openai:gpt-5.4-mini",
+    temperature=0.5,
+    timeout=10
+)
+
+agent= create_agent(
+    model=model,
+    tools=[get_weather],
+    system_prompt=system_prompt,
+    response_format=StudyNotes
+)
+
+result= agent.invoke({"messages":[{"role":"user","content":query}]})
+print(result["structured_response"])
