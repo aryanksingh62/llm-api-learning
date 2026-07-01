@@ -66,7 +66,7 @@ def web_search(query):
             logging.info(f"web_search tool success on attempt #{i}")
             return results
 
-        except requests.RequestException as e:
+        except Exception as e:
             logging.error(f"web_search tool failed #{i} times, error: {e}")
             if i == 3:
                 return f"web_search tool failed after 3 attempts: {e}"
