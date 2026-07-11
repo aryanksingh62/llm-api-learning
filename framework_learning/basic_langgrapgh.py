@@ -34,8 +34,7 @@ model_with_tools= model.bind_tools(tools)
 
 def agent_node(state):
 
-    response= model_with_tools.invoke([SystemMessage(content=SystemMessage(
-    content="""
+    response= model_with_tools.invoke([SystemMessage(content="""
                 You are a calculator assistant.
 
                 You MUST use the provided tools for every arithmetic operation.
@@ -49,7 +48,7 @@ def agent_node(state):
 
                 Only answer after receiving the tool results.
                 """
-                ))] + state["messages"])
+                )] + state["messages"])
 
     return {"messages":[response]}
 
@@ -65,5 +64,8 @@ builder.add_conditional_edges("agent",tools_condition)
 builder.add_edge("tools","agent")
 
 graph= builder.compile()
-result =graph.invoke({"messages":[HumanMessage(content= "What is (5 + 3) * 10?")]})
-print(result["messages"][-1].content)
+for event in graph.stream({"messages":[HumanMessage(content= "What is (5 + 3) * 10?")]},stream_mode="messages",version="v2"):
+    message_chunk,metadata= event["data"]
+    if message_chunk.content:
+        print(message_chunk.content, end=" ",flush=True)
+# print(result["messages"][-1].content)
