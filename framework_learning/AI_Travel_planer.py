@@ -17,18 +17,24 @@ system_prompt=""""
     You are an AI Travel Planner.
 
     Your job is to plan trips.
-    always run
+    always run:
+    first exyract the traveling dtails destination and budget and then find fligts and then afterwards search hotels and make a plan
+
     Use tools whenever you need current information
-    1. get_weather tool for find the weather in the destionatio for certain days
-    2. get_hotel tool for find the affordable hotels option to stay.
-    3. get_flight tool for find the affordable flight for reaching the destination.
-    4.extract info tool for exrtacting destination and budget then udating the travelstate
+    1.extract info tool for exrtacting destination and budget then udating the travelstate
+    2. get_weather tool for find the weather in the destionatio for certain days
+    3. get_hotel tool for find the affordable hotels option to stay.
+    4. get_flight tool for find the affordable flight for reaching the destination.
+    
 
     Always consider the user's budget and preferences.
     """
 
 @tool
-def get_flight(destination:str) ->list:
+def get_flight(destination:str):
+
+#using dummy data for learnig the langgraph
+
     """searches the flight and get the prices for the destination user want to know"""
 
     flights=[{
@@ -43,7 +49,9 @@ def get_flight(destination:str) ->list:
     return {"flights":flights}
 
 @tool
-def get_weather(detination:str,days:int) -> str:
+def get_weather(detination:str,days:int):
+#using dummy data for learnig the langgraph
+
     """find the weather for user destination for particular no of. days
     Args:
         destination: find the weather for that location
@@ -53,6 +61,8 @@ def get_weather(detination:str,days:int) -> str:
 
 @tool
 def get_hotel(destination:str):
+#using dummy data for learnig the langgraph
+
     """ it searche the for the cheap hotels for user in destination place """
     hotels=[{
         "name": "Shinjuku Grand Hotel",
@@ -79,19 +89,17 @@ def get_hotel(destination:str):
 
 @tool
 def extract_info(destination:str,budget:int):
-    """it extract  the important details like destination and budget from the user query
+    """it extract /update the important details like destination and budget from the user query
     Args:
-        destination: where do user plan want to travel/go 
-        budget: what the budget user have for this trip. its integer"""
-    
+        destination: where do user plan want to travel/go. 
+        budget: the amount of money  user have for this trip"""
+
     return {"destination":destination,"budget":budget}
 
-tools=[get_flight,get_hotel,get_weather]
+tools=[get_flight,get_hotel,get_weather,extract_info]
 model_with_tools=model.bind_tools(tools)
 tool_node= ToolNode(tools)
 
-def extract_node(state):
-    return 
 
 def agent_node(state):
     travel_info = f"""
@@ -101,31 +109,34 @@ def agent_node(state):
                     flights: {state["flights"]}
                     Hotels: {state["hotels"]}"""
     
-    response= model_with_tools([SystemMessage(content=travel_info),
-                                SystemMessage(content=system_prompt) ,state["messages"]])
-    return response
+    response= model_with_tools.invoke([SystemMessage(content=travel_info),
+                                SystemMessage(content=system_prompt) ,*state["messages"]])
+    return {"messages":[response]}
 
 class Travelstate(MessagesState):
-    destination: str| None
-    budget: int |None
-    hotels: list[dict] |None
-    flights: list[dict] |None
-    weather: str |None
+    destination: str
+    budget: int
+    hotels: list[dict]
+    flights: list[dict] 
+    weather: str
 
 builder =StateGraph(Travelstate)
 
 builder.add_node("agent",agent_node)
 builder.add_node("tools",tool_node)
-builder.add_node("extract",extract_node)
 
-builder.add_edge(START,"extract")
-builder.add_edge("extract","agent")
+builder.add_edge(START,"agent")
 builder.add_conditional_edges("agent",tools_condition)
 builder.add_edge("tools","agent")
 
 graph=builder.compile(checkpointer=memory)
 
-result= graph.stream({"messages":[HumanMessage(content="Plan a 7-day Japan trip under ₹1.5 lakh.")]},
+result= graph.stream({"messages":[HumanMessage(content="Plan a 7-day Japan trip under ₹1.5 lakh.")],
+                      "destination": None,
+                        "budget": None,
+                        "hotels": None,
+                        "flights": None,
+                        "weather": None},
                      thread_config,stream_mode="messages",version="v2")
 for event in result:
     message_chunk,metadata= event["data"]
