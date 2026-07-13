@@ -15,10 +15,15 @@ model= init_chat_model("openai:gpt-5.4-mini",
                        temperature=0.3)
 system_prompt= """you are helpful agent, whose job is to send emails 
                   by searching contacts details of the persons users want to send email.
-                  you ahve two tools:
+                  you have two tools:
                   1.search_contacts: used to find the contact details like phon eno. and email adress.
                   2. send_email use it when you want to send the email the respective email addrres. 
-                  """
+                  wrokflow:
+                        When sending an email, always work step by step.
+                        1. First, use `search_contact` to find the recipient's email address.
+                        2. Wait for the tool result before deciding the next action.
+                        3. Only after receiving the contact information should you call `send_email`.
+                        4. Never call both tools in the same response."""
 
 @tool
 def search_contact(name:str):
@@ -54,9 +59,9 @@ def approval_node(state):
     """it show the result and wait for the user approval"""
     for tool_call in state["messages"][-1].tool_calls:
         if tool_call["name"]=="send_email":
-            print(state["args"]["subject"])
-            print(state["args"]["body"])
-            print(state["args"]["recipient"])
+            print(tool_call["args"]["subject"])
+            print(tool_call["args"]["body"])
+            print(tool_call["args"]["recipient"])
     approve=interrupt("need approval..??")
 
     if approve==True:
