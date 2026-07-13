@@ -47,13 +47,16 @@ tools=[search_contact,send_email]
 model_with_tools=model.bind_tools(tools)
 tool_node=ToolNode(tools)
 
+safe_tools=["search_contact"]
+approval_tool=["send_email"]
+
 def approval_node(state):
     """it show the result and wait for the user approval"""
     for tool_call in state["messages"][-1].tool_calls:
         if tool_call["name"]=="send_email":
-            print(state["messages"][-1].tool_calls[0]["args"]["subject"])
-            print(state["messages"][-1].tool_calls[0]["args"]["body"])
-            print(state["messages"][-1].tool_calls[0]["args"]["recipient"])
+            print(state["args"]["subject"])
+            print(state["args"]["body"])
+            print(state["args"]["recipient"])
     approve=interrupt("need approval..??")
 
     if approve==True:
@@ -63,8 +66,6 @@ def approval_node(state):
 def router(state):
     """it checks before running any tools that it needs human approval or not."""
     print("router")
-    safe_tools=["search_contact"]
-    approval_tool=["send_email"]
 
     for tool_call in state["messages"][-1].tool_calls:
         tool= tool_call["name"]
